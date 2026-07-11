@@ -7,16 +7,122 @@
             "@context" : "https://schema.org",
             "@type" : "WebSite",
             "name" : "CCA Guide",
-            "url" : "https://cca.twango.dev/",
+            "url" : "https://ggkchen.github.io/cca/",
             "potentialAction": {
                 "@type": "SearchAction",
                 "target": {
                     "@type": "EntryPoint",
-                    "urlTemplate": "https://cca.twango.dev?q={search_term_string}"
+                    "urlTemplate": "https://ggkchen.github.io/cca/?q={search_term_string}"
                 },
                 "query-input": "required name=search_term_string"
             }
         }
     </script>
 
+    {# ---------------------------------------------------------------- #}
+    {# CCA Guide access gate (client-side, invite-only, Sign in with     #}
+    {# Google). NOTE: this is a SOFT gate — the page content still ships  #}
+    {# to the browser, so a determined visitor can bypass it (view raw   #}
+    {# files, clear the overlay in devtools, or set the localStorage     #}
+    {# flag). It stops casual access, not a motivated one.               #}
+    {# ---------------------------------------------------------------- #}
+    <script src="https://accounts.google.com/gsi/client" async></script>
+    <style>
+      #cca-gate{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;
+        justify-content:center;padding:24px;background:#0b0b0d;color:#fff;
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        -webkit-font-smoothing:antialiased}
+      #cca-gate .cca-card{max-width:360px;width:100%;text-align:center}
+      #cca-gate .cca-logo{height:60px;width:auto;margin:0 auto 22px;display:block}
+      #cca-gate h1{font-size:2rem;line-height:1.1;font-weight:700;margin:0 0 8px;letter-spacing:-.02em}
+      #cca-gate .cca-sub{font-size:1rem;opacity:.65;margin:0 0 30px}
+      #cca-gate #cca-gbtn{display:flex;justify-content:center;min-height:44px}
+      #cca-gate .cca-hint{font-size:.8rem;opacity:.55;margin:18px 0 0}
+      #cca-gate .cca-error{color:#ff5252;font-size:.85rem;margin:16px 0 0;display:none}
+      #cca-gate .cca-invite{font-size:.8rem;opacity:.6;margin:30px 0 0}
+      #cca-gate .cca-invite a{color:#ff5252;text-decoration:none;font-weight:600}
+      #cca-gate .cca-invite a:hover{text-decoration:underline}
+    </style>
+    <script>
+      (function () {
+        // === EDIT THESE VALUES =======================================
+        // 1) Your Google OAuth "Web application" Client ID (see runbook).
+        var CCA_CLIENT_ID = "REPLACE_WITH_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+        // 2) Invited Google emails (lowercase). Only these can get in.
+        var CCA_ALLOWLIST = [
+          "friend1@gmail.com",
+          "friend2@gmail.com"
+        ];
+        // 3) Where "Request access" points (mailto: or a Google Form URL).
+        var CCA_REQUEST_URL = "mailto:12345gavinchen@gmail.com?subject=CCA%20Guide%20access%20request";
+        // =============================================================
+
+        function parseJwt(t){
+          try {
+            var b = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+            var json = decodeURIComponent(atob(b).split('').map(function(c){
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(json);
+          } catch (e) { return null; }
+        }
+        function grant(){
+          try { localStorage.setItem('cca_ok','1'); } catch(e){}
+          var o = document.getElementById('cca-gate');
+          if (o && o.parentNode) o.parentNode.removeChild(o);
+          document.documentElement.style.overflow = '';
+        }
+        function deny(msg){
+          var e = document.getElementById('cca-error');
+          if (e){ e.textContent = msg; e.style.display = 'block'; }
+        }
+        window.ccaHandleCredential = function(resp){
+          var p = parseJwt(resp && resp.credential);
+          var email = p && p.email ? String(p.email).toLowerCase() : '';
+          var verified = p && (p.email_verified === true || p.email_verified === 'true');
+          var list = CCA_ALLOWLIST.map(function(x){ return String(x).toLowerCase(); });
+          if (email && verified && list.indexOf(email) !== -1) { grant(); }
+          else if (email) { deny(email + ' is not on the invite list.'); }
+          else { deny('Sign-in failed. Try again.'); }
+        };
+
+        function boot(){
+          var authed = false;
+          try { authed = localStorage.getItem('cca_ok') === '1'; } catch(e){}
+          if (authed) { grant(); return; }
+          document.documentElement.style.overflow = 'hidden';
+
+          var invite = document.querySelector('#cca-gate .cca-invite a');
+          if (invite) invite.setAttribute('href', CCA_REQUEST_URL);
+
+          (function initGsi(){
+            if (!(window.google && google.accounts && google.accounts.id)) {
+              return setTimeout(initGsi, 120);
+            }
+            google.accounts.id.initialize({ client_id: CCA_CLIENT_ID, callback: window.ccaHandleCredential });
+            google.accounts.id.renderButton(
+              document.getElementById('cca-gbtn'),
+              { theme: 'filled_blue', size: 'large', text: 'continue_with', shape: 'pill', width: 280 }
+            );
+          })();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else boot();
+      })();
+    </script>
+{% endblock %}
+
+{% block content %}
+  {{ super() }}
+  <div id="cca-gate" role="dialog" aria-modal="true" aria-label="Sign in to CCA Guide">
+    <div class="cca-card">
+      <img class="cca-logo" src="{{ 'assets/cca.png' | url }}" alt="" onerror="this.style.display='none'">
+      <h1>CCA Guide</h1>
+      <p class="cca-sub">Sign in to continue</p>
+      <div id="cca-gbtn"></div>
+      <p id="cca-error" class="cca-error"></p>
+      <p class="cca-hint">Access is invite-only.</p>
+      <p class="cca-invite"><a href="#">Request access &rarr;</a></p>
+    </div>
+  </div>
 {% endblock %}

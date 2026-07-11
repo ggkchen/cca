@@ -2,12 +2,12 @@
 
 site_name: CCA Guide
 
-repo_name: twangodev/cca
-repo_url: https://github.com/twangodev/cca
+repo_name: ggkchen/cca
+repo_url: https://github.com/ggkchen/cca
 edit_uri: edit/main/docs/
 
 site_author: James Ding
-site_url: https://cca.twango.dev
+site_url: https://ggkchen.github.io/cca/
 site_description: A handy guide and reference for students at California Crosspoint Academy.
 
 docs_dir: docs

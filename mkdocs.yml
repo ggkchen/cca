@@ -9,10 +9,14 @@ plugins:
   - offline
   - social
   - charts
-  - git-committers:
-      repository: twangodev/cca
-      branch: main
-      token: !ENV ["MKDOCS_GIT_COMMITTERS_APIKEY"]
+  # git-committers disabled for the ggkchen fork: it makes one GitHub API call
+  # per page, and a cold-cache build of this many pages exhausts the rate limit
+  # (unauth 60/hr; GITHUB_TOKEN 1000/hr). Re-enable with a PAT (5000/hr) + a
+  # committed .cache if you want per-page author avatars back.
+  # - git-committers:
+  #     repository: ggkchen/cca
+  #     branch: main
+  #     token: !ENV ["MKDOCS_GIT_COMMITTERS_APIKEY"]
   - git-revision-date-localized:
       enable_creation_date: true
   - rss:
