@@ -50,7 +50,7 @@
         var CCA_CLIENT_ID = "REPLACE_WITH_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
         // 2) Invited Google emails (lowercase). Only these can get in.
         var CCA_ALLOWLIST = [
-          "friend1@gmail.com",
+          "12345gavinchen@gmail.com",
           "friend2@gmail.com"
         ];
         // 3) Where "Request access" points (mailto: or a Google Form URL).
@@ -99,7 +99,7 @@
             if (!(window.google && google.accounts && google.accounts.id)) {
               return setTimeout(initGsi, 120);
             }
-            google.accounts.id.initialize({ client_id: CCA_CLIENT_ID, callback: window.ccaHandleCredential });
+            google.accounts.id.initialize({ client_id: 476047087318-dgcaebo77gbprm6b2pfl9v9j9v2vkj8b.apps.googleusercontent.com, callback: window.ccaHandleCredential });
             google.accounts.id.renderButton(
               document.getElementById('cca-gbtn'),
               { theme: 'filled_blue', size: 'large', text: 'continue_with', shape: 'pill', width: 280 }
