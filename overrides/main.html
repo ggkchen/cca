@@ -19,17 +19,34 @@
         }
     </script>
 
-    <!-- {# ---------------------------------------------------------------- #}
-    {# CCA Guide access gate (client-side, invite-only, Sign in with     #}
-    {# Google). NOTE: this is a SOFT gate — the page content still ships  #}
-    {# to the browser, so a determined visitor can bypass it (view raw   #}
-    {# files, clear the overlay in devtools, or set the localStorage     #}
-    {# flag). It stops casual access, not a motivated one.               #}
-    {# ---------------------------------------------------------------- #}
-    <script src="https://accounts.google.com/gsi/client" async></script>
+    {# ================================================================ #}
+    {#  ACCESS GATE                                                      #}
+    {#  Turn the invite-only "Sign in with Google" screen ON or OFF with #}
+    {#  the ONE line below (window.CCA_GATE_ENABLED).                    #}
+    {#    false  ->  site is fully public. No login, no Google script.   #}
+    {#    true   ->  visitors must sign in with an allow-listed Google   #}
+    {#              account before the site shows.                       #}
+    {#  (Soft gate: when ON, the pages still download to the browser, so #}
+    {#   a determined person can bypass it — it stops casual access.)    #}
+    {# ================================================================ #}
+    <script>
+      // >>> FLIP THIS to true to require Google sign-in. <<<
+      window.CCA_GATE_ENABLED = false;
+      // Show the gate before the first paint (no flash) when it's on and the
+      // visitor hasn't already signed in on this device.
+      try {
+        if (window.CCA_GATE_ENABLED && localStorage.getItem('cca_ok') !== '1') {
+          document.documentElement.classList.add('cca-gated');
+        }
+      } catch (e) {
+        if (window.CCA_GATE_ENABLED) document.documentElement.classList.add('cca-gated');
+      }
+    </script>
     <style>
-      #cca-gate{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;
-        justify-content:center;padding:24px;background:#0b0b0d;color:#fff;
+      html.cca-gated{overflow:hidden}
+      #cca-gate{display:none}                        /* hidden unless the gate is on */
+      html.cca-gated #cca-gate{position:fixed;inset:0;z-index:2147483647;display:flex;
+        align-items:center;justify-content:center;padding:24px;background:#0b0b0d;color:#fff;
         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
         -webkit-font-smoothing:antialiased}
       #cca-gate .cca-card{max-width:360px;width:100%;text-align:center}
@@ -45,15 +62,14 @@
     </style>
     <script>
       (function () {
-        // === EDIT THESE VALUES =======================================
-        // 1) Your Google OAuth "Web application" Client ID (see runbook).
+        if (!window.CCA_GATE_ENABLED) return;   // gate off -> site is public, do nothing.
+
+        // === WHEN ENABLING, set these three ==========================
         var CCA_CLIENT_ID = "476047087318-dgcaebo77gbprm6b2pfl9v9j9v2vkj8b.apps.googleusercontent.com";
-        // 2) Invited Google emails (lowercase). Only these can get in.
         var CCA_ALLOWLIST = [
           "12345gavinchen@gmail.com",
           "friend2@gmail.com"
         ];
-        // 3) Where "Request access" points (mailto: or a Google Form URL).
         var CCA_REQUEST_URL = "mailto:12345gavinchen@gmail.com?subject=CCA%20Guide%20access%20request";
         // =============================================================
 
@@ -68,6 +84,7 @@
         }
         function grant(){
           try { localStorage.setItem('cca_ok','1'); } catch(e){}
+          document.documentElement.classList.remove('cca-gated');
           var o = document.getElementById('cca-gate');
           if (o && o.parentNode) o.parentNode.removeChild(o);
           document.documentElement.style.overflow = '';
@@ -90,21 +107,28 @@
           var authed = false;
           try { authed = localStorage.getItem('cca_ok') === '1'; } catch(e){}
           if (authed) { grant(); return; }
-          document.documentElement.style.overflow = 'hidden';
-
+          document.documentElement.classList.add('cca-gated');
           var invite = document.querySelector('#cca-gate .cca-invite a');
           if (invite) invite.setAttribute('href', CCA_REQUEST_URL);
-
-          (function initGsi(){
-            if (!(window.google && google.accounts && google.accounts.id)) {
-              return setTimeout(initGsi, 120);
-            }
-            google.accounts.id.initialize({ client_id: CCA_CLIENT_ID, callback: window.ccaHandleCredential });
-            google.accounts.id.renderButton(
-              document.getElementById('cca-gbtn'),
-              { theme: 'filled_blue', size: 'large', text: 'continue_with', shape: 'pill', width: 280 }
-            );
-          })();
+          loadGsi();
+        }
+        function loadGsi(){
+          if (window.google && google.accounts && google.accounts.id) return initGsi();
+          var s = document.createElement('script');
+          s.src = 'https://accounts.google.com/gsi/client';
+          s.async = true;
+          s.onload = initGsi;
+          document.head.appendChild(s);
+        }
+        function initGsi(){
+          if (!(window.google && google.accounts && google.accounts.id)) {
+            return setTimeout(initGsi, 120);
+          }
+          google.accounts.id.initialize({ client_id: CCA_CLIENT_ID, callback: window.ccaHandleCredential });
+          google.accounts.id.renderButton(
+            document.getElementById('cca-gbtn'),
+            { theme: 'filled_blue', size: 'large', text: 'continue_with', shape: 'pill', width: 280 }
+          );
         }
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
         else boot();
@@ -125,4 +149,4 @@
       <p class="cca-invite"><a href="#">Request access &rarr;</a></p>
     </div>
   </div>
-{% endblock %}-->
+{% endblock %}
