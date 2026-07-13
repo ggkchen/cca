@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sign in · CCA Guide</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+  :root{color-scheme:dark}
+  html,body{height:100%}
+  body{margin:0;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(1200px 600px at 50% -10%, #241416 0%, #0b0b0d 55%);
+    color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .card{max-width:360px;width:100%;text-align:center}
+  .logo{height:64px;width:auto;margin:0 auto 22px;display:block}
+  h1{font-size:2rem;line-height:1.1;font-weight:700;margin:0 0 8px;letter-spacing:-.02em}
+  .sub{font-size:1rem;opacity:.65;margin:0 0 30px}
+  #gbtn{display:flex;justify-content:center;min-height:44px}
+  .hint{font-size:.8rem;opacity:.55;margin:20px 0 0}
+  .err{color:#ff5252;font-size:.85rem;margin:16px 0 0;display:none}
+  .invite{font-size:.8rem;opacity:.65;margin:28px 0 0}
+  .invite a{color:#ff5252;text-decoration:none;font-weight:600}
+  .invite a:hover{text-decoration:underline}
+  .stuck{font-size:.72rem;opacity:.4;margin:34px 0 0}
+</style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/cca/assets/cca.png" onerror="this.style.display='none'" alt="">
+    <h1>CCA Guide</h1>
+    <p class="sub">Sign in to continue</p>
+    <div id="gbtn"></div>
+    <p id="err" class="err"></p>
+    <p class="hint">Access is invite-only.</p>
+    <p class="invite"><a id="req" href="#">Request access &rarr;</a></p>
+    <p id="stuck" class="stuck"></p>
+  </main>
+<script>
+  (function () {
+    // === Same values as the rest of the gate ======================
+    var CCA_CLIENT_ID = "476047087318-dgcaebo77gbprm6b2pfl9v9j9v2vkj8b.apps.googleusercontent.com";
+    var CCA_ALLOWLIST = [
+      "12345gavinchen@gmail.com",
+      "friend2@gmail.com"
+    ];
+    var CCA_REQUEST_URL = "mailto:12345gavinchen@gmail.com?subject=CCA%20Guide%20access%20request";
+    var HOME = "/cca/";
+    // =============================================================
+
+    // Where to send the user after a successful sign-in. Only allow
+    // same-site paths under /cca/ (blocks ?redirectTo=//evil.com etc.).
+    function safeDest(){
+      var raw = new URLSearchParams(location.search).get('redirectTo');
+      if (!raw) return HOME;
+      try { raw = decodeURIComponent(raw); } catch (e) {}
+      if (raw.charAt(0) !== '/' || raw.charAt(1) === '/') return HOME;
+      if (raw.indexOf('/cca/') !== 0) return HOME;
+      return raw;
+    }
+    var DEST = safeDest();
+
+    // Already signed in on this device -> straight through.
+    try { if (localStorage.getItem('cca_ok') === '1') { location.replace(DEST); return; } } catch (e) {}
+
+    document.getElementById('req').setAttribute('href', CCA_REQUEST_URL);
+
+    function parseJwt(t){
+      try {
+        var b = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+        var json = decodeURIComponent(atob(b).split('').map(function(c){
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(json);
+      } catch (e) { return null; }
+    }
+    function grant(){ try { localStorage.setItem('cca_ok','1'); } catch(e){} location.replace(DEST); }
+    function deny(msg){ var e = document.getElementById('err'); e.textContent = msg; e.style.display = 'block'; }
+
+    window.ccaHandleCredential = function(resp){
+      var p = parseJwt(resp && resp.credential);
+      var email = p && p.email ? String(p.email).toLowerCase() : '';
+      var verified = p && (p.email_verified === true || p.email_verified === 'true');
+      var list = CCA_ALLOWLIST.map(function(x){ return String(x).toLowerCase(); });
+      if (email && verified && list.indexOf(email) !== -1) { grant(); }
+      else if (email) { deny(email + ' is not on the invite list.'); }
+      else { deny('Sign-in failed. Try again.'); }
+    };
+
+    var tries = 0;
+    (function init(){
+      if (!(window.google && google.accounts && google.accounts.id)) {
+        if (++tries > 40) { document.getElementById('stuck').textContent =
+          "Couldn't load Google sign-in. Check your connection and refresh."; }
+        return setTimeout(init, 120);
+      }
+      google.accounts.id.initialize({ client_id: CCA_CLIENT_ID, callback: window.ccaHandleCredential });
+      google.accounts.id.renderButton(
+        document.getElementById('gbtn'),
+        { theme: 'filled_blue', size: 'large', text: 'continue_with', shape: 'pill', width: 280 }
+      );
+    })();
+  })();
+</script>
+</body>
+</html>
