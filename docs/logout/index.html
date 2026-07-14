@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Signing out&hellip; · CCA Guide</title>
+</head>
+<body>
+<script>
+  // Clear the local sign-in flag and send the user back to the login page.
+  try { localStorage.removeItem('cca_ok'); } catch (e) {}
+  try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
+  location.replace('/cca/login/');
+</script>
+</body>
+</html>

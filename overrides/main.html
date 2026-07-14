@@ -23,7 +23,8 @@
     {#  ACCESS GATE                                                      #}
     {#  Every page redirects to the /cca/login/ page until the visitor   #}
     {#  has signed in with an allow-listed Google account (the login     #}
-    {#  page sets localStorage 'cca_ok').                                #}
+    {#  page sets localStorage 'cca_ok'). Signed-in visitors get a       #}
+    {#  "Sign out" control (-> /cca/logout/ clears the flag).            #}
     {#    window.CCA_GATE_ENABLED = true   -> invite-only (login first)  #}
     {#    window.CCA_GATE_ENABLED = false  -> fully public, no login     #}
     {#  Soft gate: pages still download to the browser, so it stops      #}
@@ -37,9 +38,31 @@
         if (!window.CCA_GATE_ENABLED) return;
         var authed = false;
         try { authed = localStorage.getItem('cca_ok') === '1'; } catch (e) {}
-        if (authed) return;
-        var here = location.pathname + location.search + location.hash;
-        location.replace('/cca/login/?redirectTo=' + encodeURIComponent(here));
+        if (!authed) {
+          var here = location.pathname + location.search + location.hash;
+          location.replace('/cca/login/?redirectTo=' + encodeURIComponent(here));
+          return;
+        }
+        // Signed in: add a subtle "Sign out" control (theme-matched to Material).
+        function addSignOut(){
+          if (!document.body || document.getElementById('cca-signout')) return;
+          var a = document.createElement('a');
+          a.id = 'cca-signout';
+          a.href = '/cca/logout/';
+          a.textContent = 'Sign out';
+          a.setAttribute('role', 'button');
+          a.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:6;' +
+            'font:600 .7rem/1 var(--md-text-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif);' +
+            'color:var(--md-primary-fg-color,#e53935);background:var(--md-default-bg-color,#fff);' +
+            'border:1px solid var(--md-default-fg-color--lightest,rgba(0,0,0,.12));' +
+            'padding:7px 12px;border-radius:999px;text-decoration:none;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:.8;transition:opacity .2s';
+          a.addEventListener('mouseenter', function(){ a.style.opacity = '1'; });
+          a.addEventListener('mouseleave', function(){ a.style.opacity = '.8'; });
+          document.body.appendChild(a);
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addSignOut);
+        else addSignOut();
       })();
     </script>
 {% endblock %}

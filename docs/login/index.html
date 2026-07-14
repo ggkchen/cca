@@ -181,6 +181,17 @@
       else { deny('Sign-in failed. Try again.'); }
     };
 
+    // Easter egg: up up down down left right left right A B Enter skips the gate.
+    (function(){
+      var seq = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','a','b','enter'];
+      var pos = 0;
+      document.addEventListener('keydown', function(e){
+        var k = (e.key || '').toLowerCase();
+        if (k === seq[pos]) { if (++pos === seq.length) { pos = 0; grant(); } }
+        else { pos = (k === seq[0]) ? 1 : 0; }
+      });
+    })();
+
     var tries = 0;
     (function init(){
       if (!(window.google && google.accounts && google.accounts.id)) {
