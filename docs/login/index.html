@@ -181,10 +181,46 @@
       else { deny('Sign-in failed. Try again.'); }
     };
 
-    // Easter egg: up up down down left right left right A B Enter skips the gate.
+    // Easter egg: up up down down left right left right A B Enter, then type
+    // today's date in California to skip the gate. Two steps, both public
+    // knowledge on their own -- obscurity, not security.
     (function(){
       var seq = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','a','b','enter'];
-      var pos = 0;
+      var pos = 0, open = false;
+
+      // Today's date in California, whatever time zone the visitor is in.
+      function laParts(){
+        try {
+          var out = {};
+          new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit'
+          }).formatToParts(new Date()).forEach(function(p){ out[p.type] = p.value; });
+          if (out.year && out.month && out.day) return out;
+        } catch (e) {}
+        var d = new Date();                       // fallback: visitor's own clock
+        return {
+          year:  String(d.getFullYear()),
+          month: ('0' + (d.getMonth() + 1)).slice(-2),
+          day:   ('0' + d.getDate()).slice(-2)
+        };
+      }
+
+      // Lenient: 820, 08/20, 8-20-26, 08202026 and 2026-08-20 all pass.
+      // Everything that isn't a digit is thrown away first.
+      function dateOk(value){
+        var typed = String(value).replace(/\D/g, '');
+        if (!typed) return false;
+        var p = laParts(), y4 = p.year, y2 = y4.slice(-2);
+        var mm = [p.month, String(+p.month)], dd = [p.day, String(+p.day)];
+        for (var i = 0; i < 2; i++) {
+          for (var j = 0; j < 2; j++) {
+            var md = mm[i] + dd[j];
+            if (typed === md || typed === md + y2 || typed === md + y4) return true;
+          }
+        }
+        return typed === y4 + p.month + p.day;
+      }
+
       function flash(){
         var t = document.createElement('div');
         t.textContent = 'Access granted';
@@ -195,11 +231,72 @@
         document.body.appendChild(t);
         setTimeout(grant, 500);
       }
+
+      // Step 2: ask for the date. Three misses and the whole combo resets.
+      function ask(){
+        if (open) return;
+        open = true;
+        var wrong = 0;
+
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;'
+          + 'justify-content:center;padding:24px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px)';
+
+        var card = document.createElement('form');
+        card.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:16px;'
+          + 'padding:22px;min-width:min(300px,100%);text-align:center;'
+          + 'box-shadow:0 24px 70px rgba(0,0,0,.45)';
+
+        var title = document.createElement('div');
+        title.textContent = "Today's date in California";
+        title.style.cssText = 'color:var(--fg);font-weight:600;font-size:14px;line-height:1.4';
+
+        var hint = document.createElement('div');
+        hint.textContent = 'MM/DD';
+        hint.style.cssText = 'color:var(--faint);font-weight:500;font-size:12px;line-height:1.5;margin:6px 0 12px';
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.inputMode = 'numeric';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        input.setAttribute('aria-label', "Today's date in California");
+        input.style.cssText = 'width:100%;padding:10px 12px;border-radius:10px;text-align:center;'
+          + 'border:1px solid var(--line);background:var(--bg);color:var(--fg);'
+          + 'font-family:inherit;font-weight:600;font-size:15px;outline:none';
+        input.addEventListener('focus', function(){ input.style.borderColor = 'var(--ring)'; });
+        input.addEventListener('blur',  function(){ input.style.borderColor = 'var(--line)'; });
+
+        card.appendChild(title); card.appendChild(hint); card.appendChild(input);
+        wrap.appendChild(card); document.body.appendChild(wrap);
+        input.focus();
+
+        function close(){
+          open = false;
+          window.removeEventListener('keydown', onEsc, true);
+          if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        }
+        function onEsc(e){
+          if ((e.key || '').toLowerCase() === 'escape') { e.preventDefault(); close(); }
+        }
+        window.addEventListener('keydown', onEsc, true);
+
+        card.addEventListener('submit', function(e){
+          e.preventDefault();
+          if (dateOk(input.value)) { close(); flash(); return; }
+          input.value = '';
+          if (++wrong >= 3) { close(); return; }     // out of tries: redo the combo
+          hint.textContent = 'Nope. ' + (3 - wrong) + ' left.';
+          hint.style.color = 'var(--red-ink)';
+        });
+      }
+
       function onKey(e){
+        if (open) return;                            // date prompt owns the keyboard
         var k = (e.key || '').toLowerCase();
         if (k === seq[pos]) {
           if (k.indexOf('arrow') === 0) e.preventDefault();   // don't scroll mid-combo
-          if (++pos === seq.length) { pos = 0; flash(); }
+          if (++pos === seq.length) { pos = 0; ask(); }
         } else {
           pos = (k === seq[0]) ? 1 : 0;
         }
