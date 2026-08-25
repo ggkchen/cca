@@ -74,4 +74,35 @@
         else addSignOut();
       })();
     </script>
+
+    {# ================================================================ #}
+    {#  CASUAL SAVE DETERRENT                                            #}
+    {#  Blocks the right-click menu and dragging on content images only, #}
+    {#  so right-click still works on text and links. This stops someone #}
+    {#  idly saving a picture off the page. It does NOT protect the      #}
+    {#  images: they are served ungated at their own URLs, sit in this   #}
+    {#  public repo, and also live in the public upstream it was forked  #}
+    {#  from. Screenshots, Ctrl+S and the image URL all walk around it.  #}
+    {#  Speed bump, nothing more.                                        #}
+    {# ================================================================ #}
+    <style>
+      .md-content img {
+        -webkit-touch-callout: none;   /* no long-press menu on iOS */
+        -webkit-user-drag: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+    </style>
+    <script>
+      (function () {
+        function overImage(target) {
+          return target && target.closest && target.closest('.md-content img');
+        }
+        function block(e) {
+          if (overImage(e.target)) e.preventDefault();
+        }
+        document.addEventListener('contextmenu', block, true);
+        document.addEventListener('dragstart', block, true);
+      })();
+    </script>
 {% endblock %}
