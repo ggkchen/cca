@@ -298,11 +298,27 @@
       var MAXBUF = 40;
       var buf = '', codes = null, done = false;
 
+      // A code can also arrive in the URL: /cca/login/#hiabc. That is the only
+      // way in on a phone -- this page has nothing focusable, so a soft keyboard
+      // never opens and there is nothing to type into. Fragments are never sent
+      // to the server, so the code stays out of request logs and the CDN.
+      // Read it, then strip it from the address bar and history straight away.
+      var fromLink = (function(){
+        var raw = (location.hash || '').replace(/^#/, '');
+        if (!raw) return '';
+        try { raw = decodeURIComponent(raw); } catch (e) {}
+        try {
+          if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+          else location.hash = '';
+        } catch (e) {}
+        return raw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, MAXBUF);
+      })();
+
       // Cache-bust: GitHub Pages sits behind a CDN and a stale copy would keep
       // serving a code we just revoked.
       fetch(HOME + 'access-codes.json?t=' + Date.now(), { cache: 'no-store' })
         .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(j){ codes = (j && j.codes) || []; })
+        .then(function(j){ codes = (j && j.codes) || []; attempt(fromLink, false); })
         .catch(function(){ codes = []; });
 
       function sha256hex(text){
@@ -322,16 +338,18 @@
         flashGranted(function(){ grant(until); });
       }
 
-      function check(){
-        if (done || !codes || !codes.length) return;
+      // suffix: typed characters, so only the tail of the buffer can be the code.
+      // Otherwise the candidate has to match a code outright, as a link does.
+      function attempt(candidate, suffix){
+        if (done || !candidate || !codes || !codes.length) return;
         if (!(window.crypto && crypto.subtle && window.TextEncoder)) return;
         var now = Date.now();
         codes.forEach(function(c){
           if (!c || !c.hash || !c.salt || !c.len || !c.expires) return;
           if (!(Date.parse(c.expires) > now)) return;        // lapsed, or no usable date
-          if (buf.length < c.len) return;
-          var candidate = buf.slice(-c.len);
-          sha256hex(c.salt + ':' + candidate).then(function(h){
+          var text = suffix ? candidate.slice(-c.len) : candidate;
+          if (text.length !== c.len) return;
+          sha256hex(c.salt + ':' + text).then(function(h){
             if (h === c.hash) accept(c);
           });
         });
@@ -342,7 +360,7 @@
         if (k.length !== 1) return;                          // skip Enter, Shift, arrows...
         buf += k.toLowerCase();
         if (buf.length > MAXBUF) buf = buf.slice(-MAXBUF);
-        check();
+        attempt(buf, true);
       }, true);
     })();
 

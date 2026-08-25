@@ -6,9 +6,14 @@ body:
   - type: markdown
     attributes:
       value: |
-        The code is typed blind on the login page — no field, no echo. Tell the
-        person to open the login page and just type it; "Access granted" flashes
-        when it lands.
+        Two ways in, same code:
+
+        - **Link** — send them `https://ggkchen.github.io/cca/login/#yourcode`.
+          Works on a phone. The fragment never reaches a server, and the page
+          strips it from the address bar as soon as it reads it.
+        - **Typed** — they open the login page and just type it. No field, no
+          echo; "Access granted" flashes when it lands. Desktop only: this page
+          has nothing to focus, so a phone keyboard won't open.
 
         **The code is public the moment you submit this issue.** The bot redacts
         it from the issue as soon as it runs, but anyone watching the repo in

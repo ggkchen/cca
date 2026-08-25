@@ -104,7 +104,7 @@ jobs:
             gh issue edit "$ISSUE" --body-file "$RUNNER_TEMP/redacted.md" || true
           fi
           if [ "${OK:-}" = "true" ] && [ "${PUBLISHED:-}" = "success" ]; then
-            gh issue comment "$ISSUE" --body "Code is live once the deploy finishes (about a minute). It stops working at \`$EXPIRES\` — $HOURS hour(s) from now. Signs the holder out at expiry: **$EXPIRE_SESSION**. Live codes now: $LIVE. The code itself has been redacted from this issue."
+            gh issue comment "$ISSUE" --body "Code is live once the deploy finishes (about a minute). It stops working at \`$EXPIRES\` — $HOURS hour(s) from now. Signs the holder out at expiry: **$EXPIRE_SESSION**. Live codes now: $LIVE. The code itself has been redacted from this issue. To hand it over on a phone, send \`https://ggkchen.github.io/cca/login/#<the code>\` — don't paste that link here, this issue is public."
             gh issue close "$ISSUE"
           elif [ "${OK:-}" = "true" ]; then
             # Hashed fine but never reached main -- say so plainly and leave the
