@@ -181,12 +181,25 @@
       else { deny('Sign-in failed. Try again.'); }
     };
 
-    // Easter egg: up up down down left right left right A B Enter, then type
-    // today's date in California to skip the gate. Two steps, both public
-    // knowledge on their own -- obscurity, not security.
+    // Easter egg. The combo on its own does nothing -- the date is part of the
+    // code. Type it all in one go, no prompt, no feedback:
+    //   up up down down left right left right A B <today's date> Enter
+    // where the date is today's in California (818, 08/18, 8-18-26 ... all fine).
+    // A wrong key, a wrong date, or a 15s pause silently starts it over.
+    // Obscurity, not security -- this file is public.
     (function(){
-      var seq = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','a','b','enter'];
-      var pos = 0, open = false;
+      var COMBO = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','a','b'];
+      var IDLE_MS = 15000;
+      var pos = 0, armed = false, buf = '', timer = null;
+
+      function reset(){
+        pos = 0; armed = false; buf = '';
+        if (timer) { clearTimeout(timer); timer = null; }
+      }
+      function touch(){
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(reset, IDLE_MS);
+      }
 
       // Today's date in California, whatever time zone the visitor is in.
       function laParts(){
@@ -205,10 +218,8 @@
         };
       }
 
-      // Lenient: 820, 08/20, 8-20-26, 08202026 and 2026-08-20 all pass.
-      // Everything that isn't a digit is thrown away first.
-      function dateOk(value){
-        var typed = String(value).replace(/\D/g, '');
+      // Lenient: leading zeros optional, year optional, either order.
+      function dateOk(typed){
         if (!typed) return false;
         var p = laParts(), y4 = p.year, y2 = y4.slice(-2);
         var mm = [p.month, String(+p.month)], dd = [p.day, String(+p.day)];
@@ -221,7 +232,7 @@
         return typed === y4 + p.month + p.day;
       }
 
-      function flash(){
+      function grantNow(){
         var t = document.createElement('div');
         t.textContent = 'Access granted';
         t.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;'
@@ -232,74 +243,28 @@
         setTimeout(grant, 500);
       }
 
-      // Step 2: ask for the date. Three misses and the whole combo resets.
-      function ask(){
-        if (open) return;
-        open = true;
-        var wrong = 0;
-
-        var wrap = document.createElement('div');
-        wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;'
-          + 'justify-content:center;padding:24px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px)';
-
-        var card = document.createElement('form');
-        card.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:16px;'
-          + 'padding:22px;min-width:min(300px,100%);text-align:center;'
-          + 'box-shadow:0 24px 70px rgba(0,0,0,.45)';
-
-        var title = document.createElement('div');
-        title.textContent = "Today's date in California";
-        title.style.cssText = 'color:var(--fg);font-weight:600;font-size:14px;line-height:1.4';
-
-        var hint = document.createElement('div');
-        hint.textContent = 'MM/DD';
-        hint.style.cssText = 'color:var(--faint);font-weight:500;font-size:12px;line-height:1.5;margin:6px 0 12px';
-
-        var input = document.createElement('input');
-        input.type = 'text';
-        input.inputMode = 'numeric';
-        input.autocomplete = 'off';
-        input.spellcheck = false;
-        input.setAttribute('aria-label', "Today's date in California");
-        input.style.cssText = 'width:100%;padding:10px 12px;border-radius:10px;text-align:center;'
-          + 'border:1px solid var(--line);background:var(--bg);color:var(--fg);'
-          + 'font-family:inherit;font-weight:600;font-size:15px;outline:none';
-        input.addEventListener('focus', function(){ input.style.borderColor = 'var(--ring)'; });
-        input.addEventListener('blur',  function(){ input.style.borderColor = 'var(--line)'; });
-
-        card.appendChild(title); card.appendChild(hint); card.appendChild(input);
-        wrap.appendChild(card); document.body.appendChild(wrap);
-        input.focus();
-
-        function close(){
-          open = false;
-          window.removeEventListener('keydown', onEsc, true);
-          if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-        }
-        function onEsc(e){
-          if ((e.key || '').toLowerCase() === 'escape') { e.preventDefault(); close(); }
-        }
-        window.addEventListener('keydown', onEsc, true);
-
-        card.addEventListener('submit', function(e){
-          e.preventDefault();
-          if (dateOk(input.value)) { close(); flash(); return; }
-          input.value = '';
-          if (++wrong >= 3) { close(); return; }     // out of tries: redo the combo
-          hint.textContent = 'Nope. ' + (3 - wrong) + ' left.';
-          hint.style.color = 'var(--red-ink)';
-        });
-      }
-
       function onKey(e){
-        if (open) return;                            // date prompt owns the keyboard
         var k = (e.key || '').toLowerCase();
-        if (k === seq[pos]) {
-          if (k.indexOf('arrow') === 0) e.preventDefault();   // don't scroll mid-combo
-          if (++pos === seq.length) { pos = 0; ask(); }
-        } else {
-          pos = (k === seq[0]) ? 1 : 0;
+
+        if (!armed) {
+          if (k === COMBO[pos]) {
+            if (k.indexOf('arrow') === 0) e.preventDefault();   // don't scroll mid-combo
+            if (++pos === COMBO.length) armed = true;
+            touch();
+          } else {
+            reset();
+            if (k === COMBO[0]) { pos = 1; touch(); }
+          }
+          return;
         }
+
+        // Armed: collect the date, check it on Enter. Nothing is shown either way.
+        if (k === 'enter')     { var ok = dateOk(buf); reset(); if (ok) grantNow(); return; }
+        if (k === 'backspace') { buf = buf.slice(0, -1); touch(); return; }
+        if (k.length === 1 && k >= '0' && k <= '9') { buf += k; touch(); return; }
+        if (k === '/' || k === '-' || k === '.' || k === ' ') { touch(); return; }  // separators ignored
+        if (k === 'shift' || k === 'control' || k === 'alt' || k === 'meta' || k === 'capslock') return;
+        reset();                                                // anything else starts over
       }
       // capture at window level so a focused (non-iframe) element can't swallow it
       window.addEventListener('keydown', onKey, true);
