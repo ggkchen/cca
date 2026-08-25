@@ -1,7 +1,9 @@
 name: Force Sign-Out
 
 # Rotates the localStorage session key (cca_ok2 -> cca_ok3 -> ...), which drops
-# every signed-in browser, then kicks the docs deploy so the change goes live.
+# every signed-in browser, revokes every temporary access code, then kicks the
+# docs deploy so the change goes live. Revoking the codes matters: without it,
+# anyone holding a live code walks straight back in after the rotation.
 #
 # Triggered by opening a "Force sign-out" issue from the issue template, or by
 # running this workflow by hand. Only the repository owner can trigger it.
@@ -16,8 +18,11 @@ permissions:
   issues: write     # comment on / close the request issue
   actions: write    # dispatch the deploy workflow
 
+# Shares a group with the code issuer and pruner: this job rewrites
+# docs/access-codes.json too, and two runners writing it at once would mean one
+# push loses to the other.
 concurrency:
-  group: force-logout
+  group: access-codes
   cancel-in-progress: false
 
 jobs:
@@ -59,12 +64,15 @@ jobs:
           echo "old=$old" >> "$GITHUB_OUTPUT"
           echo "new=$new" >> "$GITHUB_OUTPUT"
 
+      - name: Revoke every temporary access code
+        run: python3 .github/scripts/prune_access_codes.py --all
+
       - name: Commit and push
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(login): rotate session key"
+          git commit -am "chore(login): rotate session key and revoke temporary codes"
           git push origin HEAD:main
 
       - name: Trigger docs deploy

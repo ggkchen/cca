@@ -1,0 +1,116 @@
+name: Temporary Access Code
+
+# Turns a "Temp access code" issue into an entry in docs/access-codes.json:
+# a salted SHA-256 hash plus an expiry. The login page hashes what gets typed
+# and compares. The code is never stored in the clear -- and the bot redacts it
+# from the issue as soon as it has hashed it.
+
+on:
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+    inputs:
+      code:
+        description: The code someone will type on the login page
+        required: true
+      hours:
+        description: Hours until it stops working (1-720)
+        required: false
+        default: "24"
+      note:
+        description: Who it's for (kept in the repo)
+        required: false
+        default: ""
+      expire_session:
+        description: Also sign them out when the code expires
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+# Shared with the pruner so the two can never write the file at once.
+concurrency:
+  group: access-codes
+  cancel-in-progress: false
+
+jobs:
+  issue:
+    name: Issue a code
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.state == 'open' &&
+       github.event.issue.user.login == github.repository_owner &&
+       (contains(github.event.issue.labels.*.name, 'temp-code') ||
+        startsWith(github.event.issue.title, 'Temp access code')))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Hash the code and add it
+        id: add
+        env:
+          # Passed via env, never inlined into the script -- issue text is input.
+          EVENT: ${{ github.event_name }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          IN_CODE: ${{ inputs.code }}
+          IN_HOURS: ${{ inputs.hours }}
+          IN_NOTE: ${{ inputs.note }}
+          IN_EXPIRE: ${{ inputs.expire_session }}
+        run: python3 .github/scripts/add_access_code.py
+
+      - name: Commit and push
+        id: commit
+        if: steps.add.outputs.ok == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "::error::Nothing changed in docs/access-codes.json"
+            exit 1
+          fi
+          git commit -am "chore(access): add a temporary code"
+          git push origin HEAD:main
+
+      - name: Trigger docs deploy
+        if: steps.add.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-and-deploy-docs.yml --ref main
+
+      - name: Redact the code, report back, close
+        if: always() && github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          OK: ${{ steps.add.outputs.ok }}
+          PUBLISHED: ${{ steps.commit.outcome }}
+          ERROR: ${{ steps.add.outputs.error }}
+          EXPIRES: ${{ steps.add.outputs.expires }}
+          HOURS: ${{ steps.add.outputs.hours }}
+          EXPIRE_SESSION: ${{ steps.add.outputs.expire_session }}
+          LIVE: ${{ steps.add.outputs.live }}
+        run: |
+          set -euo pipefail
+          gh label create temp-code --color 0E8A16 --description "Issues a temporary access code" 2>/dev/null || true
+          gh issue edit "$ISSUE" --add-label temp-code || true
+          if [ -f "$RUNNER_TEMP/redacted.md" ]; then
+            gh issue edit "$ISSUE" --body-file "$RUNNER_TEMP/redacted.md" || true
+          fi
+          if [ "${OK:-}" = "true" ] && [ "${PUBLISHED:-}" = "success" ]; then
+            gh issue comment "$ISSUE" --body "Code is live once the deploy finishes (about a minute). It stops working at \`$EXPIRES\` — $HOURS hour(s) from now. Signs the holder out at expiry: **$EXPIRE_SESSION**. Live codes now: $LIVE. The code itself has been redacted from this issue."
+            gh issue close "$ISSUE"
+          elif [ "${OK:-}" = "true" ]; then
+            # Hashed fine but never reached main -- say so plainly and leave the
+            # issue open, because the code is NOT usable.
+            gh issue comment "$ISSUE" --body "**The code is not live.** It hashed correctly but the commit never reached \`main\`, so nothing was published. Nobody can use it. Re-run *Temporary Access Code* from the Actions tab, or open a new issue with a fresh code."
+          else
+            gh issue comment "$ISSUE" --body "Didn't issue a code: ${ERROR:-the job failed before it got that far}. The code has been redacted from this issue either way. Open a new issue to try again."
+            gh issue close "$ISSUE"
+          fi

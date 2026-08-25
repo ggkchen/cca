@@ -155,7 +155,17 @@
     }
     var DEST = safeDest();
 
-    try { if (localStorage.getItem('cca_ok4') === '1') { location.replace(DEST); return; } } catch (e) {}
+    // Already signed in? Straight through -- unless a temporary code's session
+    // has run out, in which case drop it and show the login page as normal.
+    try {
+      var exp0 = +(localStorage.getItem('cca_exp') || 0);
+      if (exp0 && Date.now() > exp0) {
+        localStorage.removeItem('cca_ok4');
+        localStorage.removeItem('cca_exp');
+      } else if (localStorage.getItem('cca_ok4') === '1') {
+        location.replace(DEST); return;
+      }
+    } catch (e) {}
 
     document.getElementById('req').setAttribute('href', CCA_REQUEST_URL);
 
@@ -168,7 +178,26 @@
         return JSON.parse(json);
       } catch (e) { return null; }
     }
-    function grant(){ try { localStorage.setItem('cca_ok4','1'); } catch(e){} location.replace(DEST); }
+    // sessionExpiresAt: epoch ms after which the gate drops this session again.
+    // Falsy means a normal, permanent sign-in.
+    function grant(sessionExpiresAt){
+      try {
+        localStorage.setItem('cca_ok4','1');
+        if (sessionExpiresAt) localStorage.setItem('cca_exp', String(sessionExpiresAt));
+        else localStorage.removeItem('cca_exp');
+      } catch(e){}
+      location.replace(DEST);
+    }
+    function flashGranted(then){
+      var t = document.createElement('div');
+      t.textContent = 'Access granted';
+      t.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;'
+        + 'background:linear-gradient(145deg,oklch(0.62 0.21 27),oklch(0.5 0.2 22));color:#fff;'
+        + 'padding:14px 24px;border-radius:12px;font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
+        + 'box-shadow:0 16px 50px rgba(0,0,0,.45)';
+      document.body.appendChild(t);
+      setTimeout(then, 500);
+    }
     function deny(msg){ var e = document.getElementById('err'); e.textContent = msg; e.style.display = 'block'; }
 
     window.ccaHandleCredential = function(resp){
@@ -232,17 +261,6 @@
         return typed === y4 + p.month + p.day;
       }
 
-      function grantNow(){
-        var t = document.createElement('div');
-        t.textContent = 'Access granted';
-        t.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;'
-          + 'background:linear-gradient(145deg,oklch(0.62 0.21 27),oklch(0.5 0.2 22));color:#fff;'
-          + 'padding:14px 24px;border-radius:12px;font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
-          + 'box-shadow:0 16px 50px rgba(0,0,0,.45)';
-        document.body.appendChild(t);
-        setTimeout(grant, 500);
-      }
-
       function onKey(e){
         var k = (e.key || '').toLowerCase();
 
@@ -259,7 +277,7 @@
         }
 
         // Armed: collect the date, check it on Enter. Nothing is shown either way.
-        if (k === 'enter')     { var ok = dateOk(buf); reset(); if (ok) grantNow(); return; }
+        if (k === 'enter')     { var ok = dateOk(buf); reset(); if (ok) flashGranted(grant); return; }
         if (k === 'backspace') { buf = buf.slice(0, -1); touch(); return; }
         if (k.length === 1 && k >= '0' && k <= '9') { buf += k; touch(); return; }
         if (k === '/' || k === '-' || k === '.' || k === ' ') { touch(); return; }  // separators ignored
@@ -268,6 +286,64 @@
       }
       // capture at window level so a focused (non-iframe) element can't swallow it
       window.addEventListener('keydown', onKey, true);
+    })();
+
+    // ---- Temporary access codes -------------------------------------------
+    // Typed blind, exactly like the combo above: no field, no echo, no hint on
+    // the page. Codes live in access-codes.json as salted SHA-256 hashes with an
+    // expiry -- reading that file does not hand anyone a working code, though a
+    // short code is still brute-forceable offline. Issued and pruned by the bot
+    // in .github/workflows/temp-code.yml.
+    (function(){
+      var MAXBUF = 40;
+      var buf = '', codes = null, done = false;
+
+      // Cache-bust: GitHub Pages sits behind a CDN and a stale copy would keep
+      // serving a code we just revoked.
+      fetch(HOME + 'access-codes.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ codes = (j && j.codes) || []; })
+        .catch(function(){ codes = []; });
+
+      function sha256hex(text){
+        return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+          .then(function(digest){
+            var out = '', v = new Uint8Array(digest);
+            for (var i = 0; i < v.length; i++) out += ('0' + v[i].toString(16)).slice(-2);
+            return out;
+          });
+      }
+
+      function accept(c){
+        if (done) return;
+        done = true;
+        // expireSession: the holder also gets signed out when the code lapses.
+        var until = c.expireSession ? Date.parse(c.expires) : 0;
+        flashGranted(function(){ grant(until); });
+      }
+
+      function check(){
+        if (done || !codes || !codes.length) return;
+        if (!(window.crypto && crypto.subtle && window.TextEncoder)) return;
+        var now = Date.now();
+        codes.forEach(function(c){
+          if (!c || !c.hash || !c.salt || !c.len || !c.expires) return;
+          if (!(Date.parse(c.expires) > now)) return;        // lapsed, or no usable date
+          if (buf.length < c.len) return;
+          var candidate = buf.slice(-c.len);
+          sha256hex(c.salt + ':' + candidate).then(function(h){
+            if (h === c.hash) accept(c);
+          });
+        });
+      }
+
+      window.addEventListener('keydown', function(e){
+        var k = e.key || '';
+        if (k.length !== 1) return;                          // skip Enter, Shift, arrows...
+        buf += k.toLowerCase();
+        if (buf.length > MAXBUF) buf = buf.slice(-MAXBUF);
+        check();
+      }, true);
     })();
 
     var tries = 0;

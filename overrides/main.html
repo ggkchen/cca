@@ -37,7 +37,16 @@
       (function () {
         if (!window.CCA_GATE_ENABLED) return;
         var authed = false;
-        try { authed = localStorage.getItem('cca_ok4') === '1'; } catch (e) {}
+        try {
+          // A temporary access code can carry a session expiry; once it passes,
+          // drop the sign-in and make them go through the login page again.
+          var exp = +(localStorage.getItem('cca_exp') || 0);
+          if (exp && Date.now() > exp) {
+            localStorage.removeItem('cca_ok4');
+            localStorage.removeItem('cca_exp');
+          }
+          authed = localStorage.getItem('cca_ok4') === '1';
+        } catch (e) {}
         if (!authed) {
           var here = location.pathname + location.search + location.hash;
           location.replace('/cca/login/?redirectTo=' + encodeURIComponent(here));

@@ -1,0 +1,46 @@
+name: Temporary access code
+description: Issue a code that lets someone in for a while, then stops working.
+title: "Temp access code"
+labels: ["temp-code"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The code is typed blind on the login page — no field, no echo. Tell the
+        person to open the login page and just type it; "Access granted" flashes
+        when it lands.
+
+        **The code is public the moment you submit this issue.** The bot redacts
+        it from the issue as soon as it runs, but anyone watching the repo in
+        that minute can see it. Treat these as convenience, not security.
+  - type: input
+    id: code
+    attributes:
+      label: Code
+      description: Letters and digits only, 4-40 characters. Case is ignored.
+      placeholder: hiabc
+    validations:
+      required: true
+  - type: input
+    id: hours
+    attributes:
+      label: Hours until it stops working
+      description: 1 to 720. Defaults to 24 if you leave it blank.
+      value: "24"
+    validations:
+      required: false
+  - type: input
+    id: note
+    attributes:
+      label: Who is it for
+      description: Optional, just for your own records. Kept in the repo, so don't put anything private here.
+      placeholder: e.g. study group
+    validations:
+      required: false
+  - type: checkboxes
+    id: options
+    attributes:
+      label: Options
+      options:
+        - label: Also sign them out when the code expires
+          required: false

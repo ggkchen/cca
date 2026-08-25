@@ -13,7 +13,7 @@
   try {
     for (var i = localStorage.length - 1; i >= 0; i--) {
       var k = localStorage.key(i);
-      if (k && /^cca_ok\d*$/.test(k)) localStorage.removeItem(k);
+      if (k && /^cca_(ok\d*|exp)$/.test(k)) localStorage.removeItem(k);
     }
   } catch (e) {}
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
