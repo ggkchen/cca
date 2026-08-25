@@ -23,7 +23,7 @@
     {#  ACCESS GATE                                                      #}
     {#  Every page redirects to the /cca/login/ page until the visitor   #}
     {#  has signed in with an allow-listed Google account (the login     #}
-    {#  page sets localStorage 'cca_ok'). Signed-in visitors get a       #}
+    {#  page sets localStorage 'cca_ok2'). Signed-in visitors get a       #}
     {#  "Sign out" control (-> /cca/logout/ clears the flag).            #}
     {#    window.CCA_GATE_ENABLED = true   -> invite-only (login first)  #}
     {#    window.CCA_GATE_ENABLED = false  -> fully public, no login     #}
@@ -37,7 +37,7 @@
       (function () {
         if (!window.CCA_GATE_ENABLED) return;
         var authed = false;
-        try { authed = localStorage.getItem('cca_ok') === '1'; } catch (e) {}
+        try { authed = localStorage.getItem('cca_ok2') === '1'; } catch (e) {}
         if (!authed) {
           var here = location.pathname + location.search + location.hash;
           location.replace('/cca/login/?redirectTo=' + encodeURIComponent(here));

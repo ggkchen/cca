@@ -1,0 +1,76 @@
+name: Force Sign-Out
+
+# Rotates the localStorage session key (cca_ok2 -> cca_ok3 -> ...), which drops
+# every signed-in browser, then kicks the docs deploy so the change goes live.
+#
+# Triggered by opening a "Force sign-out" issue from the issue template, or by
+# running this workflow by hand. Only the repository owner can trigger it.
+
+on:
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit the rotated key
+  issues: write     # comment on / close the request issue
+  actions: write    # dispatch the deploy workflow
+
+concurrency:
+  group: force-logout
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    name: Rotate session key
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.issue.labels.*.name, 'force-logout') &&
+       github.event.issue.user.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Rotate the key
+        id: rotate
+        run: |
+          set -euo pipefail
+          old=$(grep -ohE 'cca_ok[0-9]*' overrides/main.html | head -1)
+          if [ -z "$old" ]; then
+            echo "::error::No cca_ok* key found in overrides/main.html"
+            exit 1
+          fi
+          n=${old#cca_ok}
+          new="cca_ok$(( ${n:-1} + 1 ))"
+          grep -rl "$old" docs overrides | xargs sed -i "s/\b${old}\b/${new}/g"
+          if git diff --quiet; then
+            echo "::error::Key $old was not replaced anywhere"
+            exit 1
+          fi
+          echo "Rotated $old -> $new"
+          echo "old=$old" >> "$GITHUB_OUTPUT"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(login): rotate session key"
+          git push origin HEAD:main
+
+      - name: Trigger docs deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-and-deploy-docs.yml --ref main
+
+      - name: Report back on the issue
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body "Done. Session key rotated and the docs deploy is running — everyone is signed out once it finishes (about a minute). You'll need to sign in again too."
+          gh issue close "$ISSUE"

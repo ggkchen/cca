@@ -1,0 +1,28 @@
+name: Force sign-out
+description: Sign everyone out of the guide. Rotates the session key and redeploys.
+title: "Force sign-out"
+labels: ["force-logout"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Opening this issue rotates the guide's session key. Every signed-in
+        browser is dropped and has to sign in again — including yours.
+
+        Only issues opened by the repository owner are acted on. The bot
+        comments here and closes the issue when the redeploy is running.
+  - type: input
+    id: reason
+    attributes:
+      label: Reason
+      description: Optional. Just for your own records.
+      placeholder: e.g. invite link got shared around
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirm
+      options:
+        - label: Yes — sign everyone out.
+          required: true

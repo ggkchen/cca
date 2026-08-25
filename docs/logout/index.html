@@ -7,8 +7,15 @@
 </head>
 <body>
 <script>
-  // Clear the local sign-in flag and send the user back to the login page.
-  try { localStorage.removeItem('cca_ok'); } catch (e) {}
+  // Clear every sign-in flag we've ever issued -- the original key and all
+  // of its numbered rotations -- so rotating doesn't leave dead entries
+  // behind, then send the user back to the login page.
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && /^cca_ok\d*$/.test(k)) localStorage.removeItem(k);
+    }
+  } catch (e) {}
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
   location.replace('/cca/login/');
 </script>
