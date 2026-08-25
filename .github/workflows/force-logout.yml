@@ -23,10 +23,16 @@ concurrency:
 jobs:
   rotate:
     name: Rotate session key
+    # The issue template asks for a 'force-logout' label, but GitHub drops
+    # labels that don't exist in the repo -- so match on the title too, and
+    # let the owner check do the actual gating. Ignore closed issues so
+    # re-labelling an old request can't fire this again.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.issue.labels.*.name, 'force-logout') &&
-       github.event.issue.user.login == github.repository_owner)
+      (github.event.issue.state == 'open' &&
+       github.event.issue.user.login == github.repository_owner &&
+       (contains(github.event.issue.labels.*.name, 'force-logout') ||
+        startsWith(github.event.issue.title, 'Force sign-out')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -72,5 +78,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
+          # Create the label if it's missing, so the record is consistent.
+          # This is a GITHUB_TOKEN action, so it can't retrigger this workflow.
+          gh label create force-logout --color B60205 --description "Signs everyone out of the guide" 2>/dev/null || true
+          gh issue edit "$ISSUE" --add-label force-logout || true
           gh issue comment "$ISSUE" --body "Done. Session key rotated and the docs deploy is running — everyone is signed out once it finishes (about a minute). You'll need to sign in again too."
           gh issue close "$ISSUE"
