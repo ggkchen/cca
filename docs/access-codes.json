@@ -1,3 +1,14 @@
 {
-  "codes": []
+  "codes": [
+    {
+      "expireSession": true,
+      "expires": "2026-08-25T05:15:51Z",
+      "hash": "98531a8bd85221b8993ff5f1e37b6b8d18dab0b18a1c697b60c4297e023a2538",
+      "id": "c4386197",
+      "issued": "2026-08-25T04:15:51Z",
+      "len": 7,
+      "note": "",
+      "salt": "9765d6b2d39d6279"
+    }
+  ]
 }
