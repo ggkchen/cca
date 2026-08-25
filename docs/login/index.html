@@ -155,7 +155,7 @@
     }
     var DEST = safeDest();
 
-    try { if (localStorage.getItem('cca_ok3') === '1') { location.replace(DEST); return; } } catch (e) {}
+    try { if (localStorage.getItem('cca_ok4') === '1') { location.replace(DEST); return; } } catch (e) {}
 
     document.getElementById('req').setAttribute('href', CCA_REQUEST_URL);
 
@@ -168,7 +168,7 @@
         return JSON.parse(json);
       } catch (e) { return null; }
     }
-    function grant(){ try { localStorage.setItem('cca_ok3','1'); } catch(e){} location.replace(DEST); }
+    function grant(){ try { localStorage.setItem('cca_ok4','1'); } catch(e){} location.replace(DEST); }
     function deny(msg){ var e = document.getElementById('err'); e.textContent = msg; e.style.display = 'block'; }
 
     window.ccaHandleCredential = function(resp){
