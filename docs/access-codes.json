@@ -1,24 +1,3 @@
 {
-  "codes": [
-    {
-      "expireSession": true,
-      "expires": "2026-08-26T05:31:48Z",
-      "hash": "753d68cacd29240e9e48969ce442a416d1fce70cc4beaee1a526ed2bfde016c8",
-      "id": "cad201f5",
-      "issued": "2026-08-25T05:31:48Z",
-      "len": 14,
-      "note": "",
-      "salt": "ae475e39869046e2"
-    },
-    {
-      "expireSession": true,
-      "expires": "2026-08-26T05:32:25Z",
-      "hash": "57d2cd2f6c70f574cb8afc3e1ed673052fdff6b73cb0783a2df9ba2857b822fe",
-      "id": "c1e9acca",
-      "issued": "2026-08-25T05:32:25Z",
-      "len": 14,
-      "note": "",
-      "salt": "fd3cf3877a578e04"
-    }
-  ]
+  "codes": []
 }
