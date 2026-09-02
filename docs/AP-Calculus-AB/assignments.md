@@ -49,6 +49,7 @@
  - [HW1.5C](./assets/HW1.5C.pdf)
  - [HW1.6A](./assets/HW1.6A.pdf)
  - [HW1.6B](./assets/HW1.6B.pdf)
+ - [HW1.6C](./assets/HW1.6C.JPG)
  - [HW1.7A](./assets/HW1.7A.pdf)
  - [HW1.7B](./assets/HW1.7B.pdf)
  - [HW1.8A](./assets/HW1.8A.pdf)
